@@ -1,24 +1,28 @@
 import React from 'react';
-import logo from './logo.svg';
-import './App.css';
+import { useQuery } from './my_React_query/lib/index'
+import { queryFnSuccess, queryFnFail } from './queryFn'
+
+const callbacks = {
+  onSuccess: () => {
+    console.log('执行success回调');
+  },
+  onFail: () => {
+    console.log('执行fail回调');
+  },
+  onError: () => {
+    console.log('执行error回调');
+  }
+}
+
 
 function App() {
+  console.log('---------render-----------');
+  const { data, status } = useQuery(['测试数据1'], queryFnFail, { retry: 6, retryDelay: 1000, staleTime: 2000, ...callbacks }, window)
+
   return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.tsx</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
+    <div>
+      <h1>React App</h1>
+      <div>数据:{data},状态为:{status}</div>
     </div>
   );
 }
