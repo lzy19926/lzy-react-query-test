@@ -1,5 +1,5 @@
 import React from 'react';
-import { useQuery } from './my_React_query/lib/index'
+import { useQuery } from 'lzy-react-query'
 import { queryFnSuccess, queryFnFail } from './queryFn'
 
 const callbacks = {
@@ -17,7 +17,7 @@ const callbacks = {
 
 function App() {
   console.log('---------render-----------');
-  const { data, status } = useQuery(['测试数据1'], queryFnFail, { retry: 6, retryDelay: 1000, staleTime: 2000, ...callbacks }, window)
+  const { data, status } = useQuery(['测试数据1'], queryFnFail, { retry: 6, retryDelay: 1000, staleTime: 2000, ...callbacks })
 
   return (
     <div>
