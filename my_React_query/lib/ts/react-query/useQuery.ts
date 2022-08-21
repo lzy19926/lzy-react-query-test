@@ -24,21 +24,20 @@ export function useQuery(
     if (!queryClient) { throw new Error('client未生成') }
 
     //构建一个新的Observer observer会作为组件的一个state存留在组件中   在组件的整个生命周期内共享一个observer
-    const _ob = new QueryObserver(queryClient, parsedOptions)
-    const [observer] = React.useState(() => _ob)
-
+    //new Observer的同时会发起第一次请求
+    const [observer] = React.useState(() => new QueryObserver(queryClient, parsedOptions))
 
     // 创建reRender触发器(updater)  推入listener中 Observer通知组件更新时会触发所有的updater
-    const [renderTimes, render] = React.useState(0)
-    const updater = () => { render((oldTimes) => oldTimes + 1) }
-    observer.subscribe(updater)
+    // 放入useState的都会重复引用  (使用同一个render或observer)
+    const reRenderer = React.useState(undefined)[1]
+    observer.subscribe(reRenderer)
 
     // 创建result
     let result = observer.getResult(parsedOptions)
 
-    // 如果result空闲  则发起请求
-    if (result.status === 'loading' && result.fetchStatus === 'idle') {
-        // throw observer.fetchResult(parsedOptions)
+    // 如果是重复调用钩子  则发起请求
+    if (result.status !== 'loading' && result.fetchStatus === 'idle') {        
+        observer.checkAndFetch()
     }
 
     return observer.trackResult(result)

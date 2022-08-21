@@ -21,8 +21,11 @@ import { isShallowEqualObject } from './utils'
 
 // 检查是否能fetch (数据新鲜 且 status为error时不发请求)
 function shouldFetchByOptions(query: Query, options: QueryOptions): boolean {
-    return (!query.isStale(options.staleTime)) &&
+    const shouldFetch =
+        (!query.isStale(options.staleTime)) &&
         (query.state.status !== 'error')
+    console.log('检查是否超过新鲜时间需要发起请求?', shouldFetch);
+    return shouldFetch
 }
 
 
@@ -41,6 +44,7 @@ export interface QueryObserverResult {
 export class QueryObserver extends Subscribable {
     private client: QueryClient
     private options: QueryOptions
+    private autoFetchInterval?: ReturnType<typeof setInterval>
     private currentQuery!: Query
     private currentResult!: QueryObserverResult
     trackedProps!: Set<keyof QueryObserverResult>  // 追踪的result中的属性(用户访问一个属性就追踪一个  用来比较前后是否发生变化)
@@ -48,43 +52,55 @@ export class QueryObserver extends Subscribable {
 
     constructor(client: QueryClient, options: QueryOptions) {
         super()
+        console.log('创建observer');
         this.client = client // client中保存了cache
         this.options = options
         this.trackedProps = new Set() // 被用户使用的result中的属性  进行跟踪
-        this.setOptions(options) // 初始化
-
+        this.initObserver(options) // 初始化
     }
 
     refetch() { }
     remove() { }
 
+    // 调用Query发起请求
     fetch() {
-        this.updateQuery()
         let promise = this.currentQuery.fetch(this.options)
-        this.updateResult()
         return promise
     }
-
-
-    // 更新currnetQuery,给query添加observer
-    updateQuery() {
-        const query = this.client.getQueryCache().getQuery(this.options)
-        if (!query) { throw new Error('没有生成query,请检查queryKey') }
-        query.addObserver(this)
-        this.currentQuery = query
+    
+    // 检查后再调用Query发起请求
+    checkAndFetch() {
+        const shouldFetch = shouldFetchByOptions(this.currentQuery, this.options)
+        if (!shouldFetch) return
+        this.fetch()
     }
 
     // 根据options初始化observer(创建初始query 初始请求 创建初始result)
-    setOptions(options: QueryOptions) {
+    initObserver(options: QueryOptions) {
         this.updateQuery()// 初始化query 
-
-        const shouldFetch = shouldFetchByOptions(this.currentQuery, this.options)
-
-        if (shouldFetch) { this.fetch() }  // 初始发送请求
-
+        this.checkAndFetch() 
         this.updateResult() // 初始化result
+        this.updateAutoFetchInterval()
+    }
 
-        //todo 每隔一个新鲜时间 重新updateResult？
+    // 更新currnetQuery 给query添加observer
+    updateQuery() {
+        const query = this.client.getQueryCache().getQuery(this.options)
+        if (!query) { throw new Error('没有生成query,请检查queryKey') }
+        if (this.currentQuery === query) return
+        query.addObserver(this)
+        console.log('添加observer');
+        this.currentQuery = query
+    }
+
+    // 更新自动重请求Interval
+    updateAutoFetchInterval() {
+        const interval: number | false | undefined = this.options.autoFetchInterval
+        if (!interval || interval <= 0) return
+        clearInterval(this.autoFetchInterval)
+        this.autoFetchInterval = setInterval(() => {
+            this.fetch()
+        }, interval)
     }
 
     // (根据追踪的props)更新result 获取前后两次的result
@@ -133,7 +149,7 @@ export class QueryObserver extends Subscribable {
             status,
             fetchStatus,
             error,
-            isStale: query.isStale.bind(null, options.staleTime),
+            isStale: query.isStale.bind(query, this.options.staleTime),
             refetch: this.refetch,
             remove: this.remove,
         }
@@ -145,13 +161,6 @@ export class QueryObserver extends Subscribable {
     getResult(options: QueryOptions): QueryObserverResult {
         const query = this.client.getQueryCache().getQuery(options)
         return this.createResult(query, options)
-    }
-
-    //todo fetch后再创建一个用Promise包裹的Result返回(未完成)
-    fetchResult(options: QueryOptions): Promise<QueryObserverResult> {
-        const query = this.client.getQueryCache().getQuery(options)
-        return query.fetch(options)
-            .then(() => this.createResult(query, options))
     }
 
     // Query获取数据更新成功 调用此方法  更新Result

@@ -2,30 +2,31 @@
 
 export type Listener = Function
 export class Subscribable {
-    protected listeners: Listener[]
-
+    listeners: Set<Listener>
     constructor() {
-        this.listeners = []
+        this.listeners = new Set()
         this.subscribe = this.subscribe.bind(this)
     }
 
+    // subscribe方法返回一个unSubscribe方法(因为可以通过闭包访问到该listener)
     subscribe(listener: Listener): () => void {
-        this.listeners.push(listener)
+        this.listeners.add(listener)
         this.onSubscribe()
         return () => {
-            this.listeners = this.listeners.filter((x) => x !== listener)
+            this.listeners.delete(listener)
             this.onUnsubscribe()
         }
     }
-
+    
     hasListeners(): boolean {
-        return this.listeners.length > 0
+        return Object.keys(this.listeners).length > 0
     }
 
+    // 订阅回调
     protected onSubscribe(): void {
         // Do nothing
     }
-
+    // 取消订阅回调
     protected onUnsubscribe(): void {
         // Do nothing
     }

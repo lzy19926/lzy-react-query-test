@@ -9,6 +9,7 @@ export interface FetchOptions {
     retry?: number | boolean,
     retryDelay?: number,
     staleTime?: number
+    autoFetchInterval?: number | false,
     onSuccess?: Function,
     onFail?: Function,
     onError?: Function
@@ -89,8 +90,9 @@ function getDefaultOptions(): QueryOptions {
     return {
         queryKey: [],
         retry: 3,
-        retryDelay: 3000,
-        staleTime: 5000
+        retryDelay: 1000,
+        staleTime: 5000,
+        autoFetchInterval: false
     }
 }
 

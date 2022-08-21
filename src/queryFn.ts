@@ -1,4 +1,4 @@
-
+import axios from "axios";
 export const queryFnSuccess = async () => {
     console.log('发起请求(成功)');
     await delayer(3000) // 3s后返回数据
@@ -18,5 +18,12 @@ async function delayer(time = 2000) {
         }, time);
     });
 }
+
+
+
+export function getUser() {
+    return axios.get('http://localhost:3030/user')
+}
+
 
 

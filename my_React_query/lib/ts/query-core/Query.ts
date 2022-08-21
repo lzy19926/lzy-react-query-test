@@ -18,7 +18,7 @@ export class Query {
     state: QueryState
     private cache: QueryCache
     private retryer?: Retryer
-    private observers: QueryObserver[]
+    observers: QueryObserver[]
     private promise?: Promise<any> // 保存的结果(从retryer中获取)
 
     constructor(config: QueryConfig) {
@@ -27,6 +27,7 @@ export class Query {
         this.cache = config.cache
         this.queryKey = config.queryKey
         this.state = config.state || getDefaultQueryState()
+        console.log('创建Query', config.options.queryKey);
     }
 
 
@@ -35,8 +36,8 @@ export class Query {
         const removeUndefinedOptions = Object.fromEntries(Object.entries(options).filter(([_, v]) => v != null));
         this.options = { ...this.options, ...removeUndefinedOptions }
     }
-    // 数据是否新鲜(byTime)
-    isStale(staleTime: number = 5000): boolean {
+    // 数据是否新鲜(byTime)?
+    isStale(staleTime: number = 3000): boolean {
         const updateAt = this.state.dataUpdatedAt
         if (!updateAt) return false
         if ((Date.now() - updateAt) < staleTime) return true
@@ -72,9 +73,6 @@ export class Query {
         const fetchFn = this.options.queryFn
 
         // 定义retryer的回调  (dispatch一个Action 用来修改Query的状态)
-        // if (this.state.fetchStatus === 'idle') {// 如果空闲就发起一次请求
-        //     this.dispatch({ type: 'fetch' })
-        // }
         const onError = (error: Error) => {
             this.dispatch({ type: 'error', error })
         }
@@ -93,7 +91,11 @@ export class Query {
             this.dispatch({ type: 'continue' })
         }
 
-        // try to refresh data
+
+        //  如果空闲就发起一次请求
+        if (this.state.fetchStatus === 'idle') {
+            this.dispatch({ type: 'fetch' })
+        }
         this.retryer = createRetryer({
             fn: fetchFn,
             // abort: false, // 终止指针
@@ -115,34 +117,18 @@ export class Query {
 
     // 根据action创建创建不同的reducer 来修改当前query的状态
     private dispatch(action: Action): void {
-        console.log('触发Query更新', action);
-
         const reducer = (state: QueryState): QueryState => {
             switch (action.type) {
-                case 'failed':
-                    return {
-                        ...state,
-                        fetchFailureCount: state.fetchFailureCount + 1,
-                    }
-                case 'pause':
-                    return {
-                        ...state,
-                        fetchStatus: 'paused',
-                    }
-                case 'continue':
-                    return {
-                        ...state,
-                        fetchStatus: 'fetching',
-                    }
                 case 'fetch':
+                    console.log('发起请求事件');
                     return {
                         ...state,
                         fetchFailureCount: 0,
-                        // fetchStatus: canFetch(this.options.networkMode)
-                        //     ? 'fetching'
-                        //     : 'paused',
+                        fetchStatus: 'fetching',
+                        status: 'loading'
                     }
                 case 'success':
+                    console.log('请求成功事件');
                     return {
                         ...state,
                         data: action.data,
@@ -150,22 +136,42 @@ export class Query {
                         dataUpdatedAt: action.dataUpdatedAt ?? Date.now(),
                         error: null,
                         status: 'success',
+                        fetchStatus: 'idle'
+                    }
+                case 'failed':
+                    console.log('请求失败事件');
+                    return {
+                        ...state,
+                        fetchFailureCount: state.fetchFailureCount + 1,
                     }
                 case 'error':
                     const error = action.error
+                    console.log('请求错误事件');
                     return {
                         ...state,
                         error: error,
                         errorUpdateCount: state.errorUpdateCount + 1,
                         fetchFailureCount: state.fetchFailureCount + 1,
                         status: 'error',
+                        fetchStatus: 'idle'
+                    }
+                case 'pause':
+                    console.log('请求暂停事件');
+                    return {
+                        ...state,
+                        fetchStatus: 'paused',
+                    }
+                case 'continue':
+                    console.log('请求继续事件');
+                    return {
+                        ...state,
+                        fetchStatus: 'fetching',
                     }
             }
         }
 
         this.state = reducer(this.state) //修改query的state
-        console.log('Query更新完毕', this.state);
-    
+
         // 通知所有的observer  state更新了  observer重新渲染组件
         this.observers.forEach((observer) => {
             observer.onQueryUpdate(action)
