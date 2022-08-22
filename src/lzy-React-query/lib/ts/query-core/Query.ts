@@ -20,6 +20,7 @@ export class Query {
     private retryer?: Retryer
     observers: QueryObserver[]
     private promise?: Promise<any> // 保存的结果(从retryer中获取)
+    private GCtimer?: ReturnType<typeof setTimeout>// 垃圾回收timer
 
     constructor(config: QueryConfig) {
         this.options = config.options
@@ -28,13 +29,27 @@ export class Query {
         this.queryKey = config.queryKey
         this.state = config.state || getDefaultQueryState()
         console.log('创建Query', config.options.queryKey);
+        this.updateGCTimer()
     }
-
 
     // 更新上一次的options
     updateOptions(options: QueryOptions) {
         const removeUndefinedOptions = Object.fromEntries(Object.entries(options).filter(([_, v]) => v != null));
         this.options = { ...this.options, ...removeUndefinedOptions }
+    }
+    // 装载垃圾回收器 (缓存时间到后删除Query)
+    updateGCTimer() {
+        const cacheTime = this.options.cacheTime
+        if (!cacheTime) return
+        this.GCtimer = setTimeout(() => {
+            console.log('垃圾回收');
+            this.destory()
+            clearTimeout(this.GCtimer)
+        }, cacheTime)
+    }
+    // Query是否正在被使用
+    isActive(): boolean {
+        return this.observers.some((observer) => observer.options.enable !== false)
     }
     // 数据是否新鲜(byTime)?
     isStale(staleTime: number = 3000): boolean {
@@ -55,7 +70,12 @@ export class Query {
             this.observers = this.observers.filter((x) => x !== observer)
         }
     }
-
+    // Query自我销毁
+    destory() {
+        const canDestory = (this.state.fetchStatus === 'idle') && (this.state.status !== 'loading')
+        this.cache.removeQuery(this)
+    }
+    // 创建retryer  发起请求
     fetch(options: QueryOptions): Promise<any> {
         // 更新options
         if (options) {
@@ -113,7 +133,6 @@ export class Query {
 
         return this.promise
     }
-
 
     // 根据action创建创建不同的reducer 来修改当前query的状态
     private dispatch(action: Action): void {

@@ -2,7 +2,7 @@
   "name": "lzy-react-query",
   "version": "1.0.2",
   "description": "",
-  "main": "index.ts",
+  "main": "./index.ts",
   "directories": {
     "lib": "lib"
   },

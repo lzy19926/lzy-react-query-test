@@ -16,6 +16,7 @@ function getDefaultOptions() {
         retry: 3,
         retryDelay: 1000,
         staleTime: 5000,
+        cacheTime: 10000,
         autoFetchInterval: false
     };
 }

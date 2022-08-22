@@ -6,17 +6,20 @@ export type QueryFunction = (...params: any) => Promise<any>
 
 export type QueryKey = string[]
 export interface FetchOptions {
-    retry?: number | boolean,
-    retryDelay?: number,
-    staleTime?: number
-    autoFetchInterval?: number | false,
-    onSuccess?: Function,
+    retry?: number | false, //失败是否重复请求(请求次数)
+    retryDelay?: number,//失败重复请求延迟
+    staleTime?: number,//数据新鲜时间
+    cacheTime?: number,//数据缓存时间
+    autoFetchInterval?: number | false,//轮询时间
+    enable?: boolean //请求是否可用
+    onSuccess?: Function,// 请求完成回调
     onFail?: Function,
     onError?: Function
+
 }
 export interface QueryOptions extends FetchOptions {
-    queryKey: QueryKey,
-    queryFn?: QueryFunction,
+    queryKey: QueryKey,  //查询key
+    queryFn?: QueryFunction, //请求函数
 }
 
 export interface QueryConfig {
@@ -92,6 +95,7 @@ function getDefaultOptions(): QueryOptions {
         retry: 3,
         retryDelay: 1000,
         staleTime: 5000,
+        cacheTime: 10000,
         autoFetchInterval: false
     }
 }

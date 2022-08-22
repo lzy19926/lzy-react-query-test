@@ -5,7 +5,7 @@ export class QueryCache extends Subscribable {
     constructor(client, config) {
         super();
         this.config = config || {};
-        this.queries = [];
+        this.queries = new Set();
         this.queriesMap = {};
         this.queryClient = client;
     }
@@ -14,6 +14,9 @@ export class QueryCache extends Subscribable {
         let query = this.findQuery(options.queryKey[0]) ||
             this.createQuery(options, state);
         return query;
+    }
+    getQueries() {
+        return this.queriesMap;
     }
     // 新建一个query
     createQuery(options, state) {
@@ -31,15 +34,19 @@ export class QueryCache extends Subscribable {
         const key = query.queryKey[0];
         if (!this.queriesMap[key]) {
             this.queriesMap[key] = query;
-            this.queries.push(query);
+            this.queries.add(query);
         }
     }
     // 删除Query
     removeQuery(query) {
+        const key = query.queryKey[0];
+        if (this.queriesMap[key] === query) {
+            delete this.queriesMap[key];
+            this.queries.delete(query);
+        }
     }
     //TODO 通过查询键/函数 找到query并返回
     findQuery(queryKey) {
-        // return this.queries.find((query) => matchQuery(queryKey, query))
         return this.queriesMap[queryKey];
     }
 }

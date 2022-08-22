@@ -13,7 +13,6 @@ import { QueryCache } from './QueryCache'
 
 export class QueryClient {
     private queryCache: QueryCache
-
     constructor() {
         this.queryCache = new QueryCache(this)
     }

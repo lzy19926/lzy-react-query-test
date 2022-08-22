@@ -1,4 +1,4 @@
-import { useQuery } from '../lib/index'
+import { useQuery } from '../index'
 
 let testWindow: any = {}
 
@@ -12,13 +12,13 @@ const queryFnFail = () => {
 }
 
 // render1
-const res = useQuery(['测试数据1'], queryFnSuccess, { retry: 6, retryDelay: 1000, staleTime: 2000 }, testWindow)
+const res = useQuery(['测试数据1'], queryFnSuccess, { retry: 6, retryDelay: 1000, staleTime: 2000 })
 console.log(res);
 console.log('----------------------------------------');
 
 
 setTimeout(() => {
-    const res2 = useQuery(['测试数据1'], queryFnSuccess, { retry: 6, retryDelay: 1000, staleTime: 2000 }, testWindow)
+    const res2 = useQuery(['测试数据1'], queryFnSuccess, { retry: 6, retryDelay: 1000, staleTime: 2000 })
     console.log('----------------------------------------');
     console.log(res2);
 }, 1000)

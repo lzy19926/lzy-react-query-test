@@ -42,12 +42,12 @@ export interface QueryObserverResult {
 
 
 export class QueryObserver extends Subscribable {
+    options: QueryOptions
     private client: QueryClient
-    private options: QueryOptions
     private autoFetchInterval?: ReturnType<typeof setInterval>
     private currentQuery!: Query
     private currentResult!: QueryObserverResult
-    trackedProps!: Set<keyof QueryObserverResult>  // 追踪的result中的属性(用户访问一个属性就追踪一个  用来比较前后是否发生变化)
+    private trackedProps!: Set<keyof QueryObserverResult>  // 追踪的result中的属性(用户访问一个属性就追踪一个  用来比较前后是否发生变化)
 
 
     constructor(client: QueryClient, options: QueryOptions) {
@@ -57,6 +57,7 @@ export class QueryObserver extends Subscribable {
         this.options = options
         this.trackedProps = new Set() // 被用户使用的result中的属性  进行跟踪
         this.initObserver(options) // 初始化
+
     }
 
     refetch() { }
@@ -67,7 +68,7 @@ export class QueryObserver extends Subscribable {
         let promise = this.currentQuery.fetch(this.options)
         return promise
     }
-    
+
     // 检查后再调用Query发起请求
     checkAndFetch() {
         const shouldFetch = shouldFetchByOptions(this.currentQuery, this.options)
@@ -78,9 +79,9 @@ export class QueryObserver extends Subscribable {
     // 根据options初始化observer(创建初始query 初始请求 创建初始result)
     initObserver(options: QueryOptions) {
         this.updateQuery()// 初始化query 
-        this.checkAndFetch() 
+        this.checkAndFetch() // 初始请求
         this.updateResult() // 初始化result
-        this.updateAutoFetchInterval()
+        this.updateAutoFetchInterval() // 初始化轮询
     }
 
     // 更新currnetQuery 给query添加observer
@@ -89,7 +90,6 @@ export class QueryObserver extends Subscribable {
         if (!query) { throw new Error('没有生成query,请检查queryKey') }
         if (this.currentQuery === query) return
         query.addObserver(this)
-        console.log('添加observer');
         this.currentQuery = query
     }
 

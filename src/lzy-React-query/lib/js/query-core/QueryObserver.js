@@ -42,9 +42,9 @@ export class QueryObserver extends Subscribable {
     // 根据options初始化observer(创建初始query 初始请求 创建初始result)
     initObserver(options) {
         this.updateQuery(); // 初始化query 
-        this.checkAndFetch();
+        this.checkAndFetch(); // 初始请求
         this.updateResult(); // 初始化result
-        this.updateAutoFetchInterval();
+        this.updateAutoFetchInterval(); // 初始化轮询
     }
     // 更新currnetQuery 给query添加observer
     updateQuery() {
@@ -55,7 +55,6 @@ export class QueryObserver extends Subscribable {
         if (this.currentQuery === query)
             return;
         query.addObserver(this);
-        console.log('添加observer');
         this.currentQuery = query;
     }
     // 更新自动重请求Interval

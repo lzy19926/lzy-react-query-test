@@ -1,6 +1,4 @@
 import { QueryClient } from '../query-core/QueryClient';
-//! 模拟window对象
-// let window: { LzyReactQueryClient?: QueryClient } = {}
 // 在这里创建一个client 挂载到window全局(暂定)  如果有则返回之前的client
 //todo 需要修改为使用context分发
 export function useQueryClient() {

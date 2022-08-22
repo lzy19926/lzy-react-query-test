@@ -17,7 +17,7 @@ export class Subscribable {
             this.onUnsubscribe()
         }
     }
-    
+
     hasListeners(): boolean {
         return Object.keys(this.listeners).length > 0
     }

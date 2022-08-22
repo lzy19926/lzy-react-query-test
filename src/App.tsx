@@ -1,5 +1,6 @@
 import React from 'react';
-import { useQuery } from 'lzy-react-query'
+import { useQuery } from './lzy-React-query/index'
+// import { useQuery, useQueryClient } from 'react-query'
 import { getUser, queryFnSuccess, queryFnFail } from './queryFn'
 import { useState } from 'react';
 
@@ -18,8 +19,7 @@ const callbacks = {
 
 function App() {
   console.log('---------render-----------');
-
-  const { data, status, isStale } = useQuery(['测试数据1'], queryFnSuccess, { retry: 6, retryDelay: 1000, staleTime: 3000, autoFetchInterval: false, ...callbacks })
+  const { data, status, isStale } = useQuery(['测试数据1'], getUser, { retry: 3, retryDelay: 1000, staleTime: 3000, ...callbacks, cacheTime: 10000 })
 
   const [num, setNum] = useState(0)
 

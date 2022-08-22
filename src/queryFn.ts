@@ -26,4 +26,8 @@ export function getUser() {
 }
 
 
+console.log(1);
+
+
+
 

@@ -13,11 +13,27 @@ export class Query {
         this.queryKey = config.queryKey;
         this.state = config.state || getDefaultQueryState();
         console.log('创建Query', config.options.queryKey);
+        this.updateGCTimer();
     }
     // 更新上一次的options
     updateOptions(options) {
         const removeUndefinedOptions = Object.fromEntries(Object.entries(options).filter(([_, v]) => v != null));
         this.options = Object.assign(Object.assign({}, this.options), removeUndefinedOptions);
+    }
+    // 装载垃圾回收器 (缓存时间到后删除Query)
+    updateGCTimer() {
+        const cacheTime = this.options.cacheTime;
+        if (!cacheTime)
+            return;
+        this.GCtimer = setTimeout(() => {
+            console.log('垃圾回收');
+            this.destory();
+            clearTimeout(this.GCtimer);
+        }, cacheTime);
+    }
+    // Query是否正在被使用
+    isActive() {
+        return this.observers.some((observer) => observer.options.enable !== false);
     }
     // 数据是否新鲜(byTime)?
     isStale(staleTime = 3000) {
@@ -40,6 +56,12 @@ export class Query {
             this.observers = this.observers.filter((x) => x !== observer);
         }
     }
+    // Query自我销毁
+    destory() {
+        const canDestory = (this.state.fetchStatus === 'idle') && (this.state.status !== 'loading');
+        this.cache.removeQuery(this);
+    }
+    // 创建retryer  发起请求
     fetch(options) {
         // 更新options
         if (options) {
