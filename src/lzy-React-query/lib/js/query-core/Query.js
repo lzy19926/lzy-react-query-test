@@ -27,7 +27,8 @@ export class Query {
             return;
         this.GCtimer = setTimeout(() => {
             console.log('垃圾回收');
-            this.destory();
+            // this.destory()
+            this.cache.removeQuery(this);
             clearTimeout(this.GCtimer);
         }, cacheTime);
     }
@@ -56,10 +57,12 @@ export class Query {
             this.observers = this.observers.filter((x) => x !== observer);
         }
     }
-    // Query自我销毁
+    // Query自我销毁(无observer时销毁)
     destory() {
-        const canDestory = (this.state.fetchStatus === 'idle') && (this.state.status !== 'loading');
-        this.cache.removeQuery(this);
+        const canDestory = (!this.observers.length) && (this.state.fetchStatus === 'idle');
+        if (canDestory) {
+            this.cache.removeQuery(this);
+        }
     }
     // 创建retryer  发起请求
     fetch(options) {
@@ -88,7 +91,6 @@ export class Query {
         };
         const onFail = () => {
             this.dispatch({ type: 'failed' });
-            console.log('请求失败并修改了Query');
         };
         const onPause = () => {
             this.dispatch({ type: 'pause' });

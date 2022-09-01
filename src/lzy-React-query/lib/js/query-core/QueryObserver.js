@@ -23,10 +23,12 @@ export class QueryObserver extends Subscribable {
         this.client = client; // client中保存了cache
         this.options = options;
         this.trackedProps = new Set(); // 被用户使用的result中的属性  进行跟踪
-        this.initObserver(options); // 初始化
+        this.initObserver(); // 初始化
     }
     refetch() { }
-    remove() { }
+    remove() {
+        this.client.getQueryCache().removeQuery(this.currentQuery);
+    }
     // 调用Query发起请求
     fetch() {
         let promise = this.currentQuery.fetch(this.options);
@@ -40,22 +42,23 @@ export class QueryObserver extends Subscribable {
         this.fetch();
     }
     // 根据options初始化observer(创建初始query 初始请求 创建初始result)
-    initObserver(options) {
-        this.updateQuery(); // 初始化query 
+    initObserver() {
+        this.updateQuery(this.options); // 初始化query 
         this.checkAndFetch(); // 初始请求
         this.updateResult(); // 初始化result
         this.updateAutoFetchInterval(); // 初始化轮询
     }
-    // 更新currnetQuery 给query添加observer
-    updateQuery() {
-        const query = this.client.getQueryCache().getQuery(this.options);
+    // 创建/查询并更新currnetQuery 给query添加observer
+    updateQuery(options) {
+        const query = this.client.getQueryCache().getQuery(options);
         if (!query) {
             throw new Error('没有生成query,请检查queryKey');
         }
         if (this.currentQuery === query)
             return;
-        query.addObserver(this);
         this.currentQuery = query;
+        query.addObserver(this);
+        return query;
     }
     // 更新自动重请求Interval
     updateAutoFetchInterval() {
@@ -101,6 +104,10 @@ export class QueryObserver extends Subscribable {
         const prevResult = this.currentResult;
         let { state } = query;
         let { status, fetchStatus, error, data } = state;
+        // 如果没有结果 展示placeholderData
+        if (typeof data === 'undefined' && status === 'loading') {
+            data = prevResult === null || prevResult === void 0 ? void 0 : prevResult.data;
+        }
         // 返回的结果
         const result = {
             data,
@@ -113,28 +120,39 @@ export class QueryObserver extends Subscribable {
         };
         return result;
     }
-    // 创建一个result返回
+    // 创建一个result返回(如果发现Query更新了,重新initObserver)
     getResult(options) {
         const query = this.client.getQueryCache().getQuery(options);
+        if (query !== this.currentQuery) {
+            this.initObserver();
+        }
         return this.createResult(query, options);
     }
     // Query获取数据更新成功 调用此方法  更新Result
     onQueryUpdate(action) {
         console.log('Query获取数据更新成功  更新Result 执行回调');
-        if (action.type === 'success') {
-            if (this.options.onSuccess) {
-                this.options.onSuccess();
-            }
-        }
-        else if (action.type === 'failed') {
-            if (this.options.onFail) {
-                this.options.onFail();
-            }
-        }
-        else if (action.type === 'error') {
-            if (this.options.onError) {
-                this.options.onError();
-            }
+        const { onSuccess, onFail, onError } = this.options;
+        switch (action.type) {
+            case "success":
+                if (onSuccess) {
+                    onSuccess(this.currentQuery.state.data);
+                }
+                ;
+                break;
+            case "failed":
+                if (onFail) {
+                    onFail();
+                }
+                ;
+                break;
+            case "error":
+                if (onError) {
+                    onError(this.currentQuery.state.error);
+                }
+                ;
+                break;
+            default:
+                break;
         }
         this.updateResult();
     }

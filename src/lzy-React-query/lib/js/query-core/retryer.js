@@ -14,6 +14,8 @@ export function createRetryer(config) {
     const promise = new Promise((outerResolve, outerReject) => {
         promiseResolve = outerResolve;
         promiseReject = outerReject;
+    }).catch((err) => {
+        console.error(err);
     });
     // 这里重新封装了resolve和reject(执行器函数)
     //!首先保存原本的resolve和reject，在执行原本的resolve和reject之前先改变retryer的状态 并执行相应的回调(onsuccess,onfail)
@@ -40,7 +42,7 @@ export function createRetryer(config) {
         // 执行函数  获取结果或者抛出promise错误
         let promiseOrValue;
         try {
-            promiseOrValue = config.fn(); // Promise.resolve()
+            promiseOrValue = config.fn(); //!Promise.resolve()  执行queryFn 
         }
         catch (err) {
             promiseOrValue = Promise.reject(err);
@@ -48,10 +50,10 @@ export function createRetryer(config) {
         // 将结果丢入promise继续循环
         Promise.resolve(promiseOrValue)
             .then(resolve) // 首先调用resolve返回结果
-            .catch((err) => {
+            .catch((error) => {
             if (isResolved)
                 return;
-            retry(err);
+            retry(error);
         });
     };
     const retry = (error) => {

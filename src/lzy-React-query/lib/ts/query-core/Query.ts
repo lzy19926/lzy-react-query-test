@@ -3,6 +3,7 @@ import { QueryObserver } from './QueryObserver'
 import { QueryKey, QueryOptions, QueryState, Action, Retryer, QueryConfig } from './types'
 import { getDefaultQueryState } from './types'
 import { createRetryer } from './retryer'
+import { log } from 'console'
 
 // Query是react-query底层核心类，它负责网络数据请求、状态变化的处理、以及内存回收工作。
 //Query给Retryer指定fn（请求函数主体）、retry（重试次数）、retryDelay（重试延迟时间），以及一系列状态变化回调函数（比如onSuccess、onPause等）。
@@ -43,7 +44,8 @@ export class Query {
         if (!cacheTime) return
         this.GCtimer = setTimeout(() => {
             console.log('垃圾回收');
-            this.destory()
+            // this.destory()
+            this.cache.removeQuery(this)
             clearTimeout(this.GCtimer)
         }, cacheTime)
     }
@@ -70,10 +72,12 @@ export class Query {
             this.observers = this.observers.filter((x) => x !== observer)
         }
     }
-    // Query自我销毁
+    // Query自我销毁(无observer时销毁)
     destory() {
-        const canDestory = (this.state.fetchStatus === 'idle') && (this.state.status !== 'loading')
-        this.cache.removeQuery(this)
+        const canDestory = (!this.observers.length) && (this.state.fetchStatus === 'idle')
+        if (canDestory) {
+            this.cache.removeQuery(this)
+        }
     }
     // 创建retryer  发起请求
     fetch(options: QueryOptions): Promise<any> {
@@ -102,7 +106,6 @@ export class Query {
         }
         const onFail = () => {
             this.dispatch({ type: 'failed' })
-            console.log('请求失败并修改了Query');
         }
         const onPause = () => {
             this.dispatch({ type: 'pause' })

@@ -60,6 +60,9 @@ export class QueryCache extends Subscribable {
             delete this.queriesMap[key]
             this.queries.delete(query)
         }
+
+        console.log('删除Query', this.queries);
+
     }
 
     //TODO 通过查询键/函数 找到query并返回

@@ -7,18 +7,21 @@ function parseQueryArgs(keys, fn, options) {
     const defaultOptions = getDefaultOptions();
     return Object.assign(Object.assign(Object.assign({}, defaultOptions), options), { queryFn: fn, queryKey: keys });
 }
-export function useQuery(keys, queryFn, options) {
+export function useQuery(keys, queryFn, options, outerQueryClient) {
     const parsedOptions = parseQueryArgs(keys, queryFn, options); // 返回格式化后的options
     // 创建/获取一个client
-    let queryClient = useQueryClient();
+    let queryClient; //!   测试用外部client
+    queryClient = useQueryClient();
+    if (outerQueryClient) {
+        queryClient = outerQueryClient;
+    }
     if (!queryClient) {
         throw new Error('client未生成');
     }
-    //构建一个新的Observer observer会作为组件的一个state存留在组件中   在组件的整个生命周期内共享一个observer
+    //构建一个新的Observer  放入useState的都会重复引用  (使用同一个render或observer)  在组件的整个生命周期内共享一个observer
     //new Observer的同时会发起第一次请求
     const [observer] = React.useState(() => new QueryObserver(queryClient, parsedOptions));
     // 创建reRender触发器(updater)  推入listener中 Observer通知组件更新时会触发所有的updater
-    // 放入useState的都会重复引用  (使用同一个render或observer)
     const reRenderer = React.useState(undefined)[1];
     observer.subscribe(reRenderer);
     // 创建result
@@ -27,5 +30,9 @@ export function useQuery(keys, queryFn, options) {
     if (result.status !== 'loading' && result.fetchStatus === 'idle') {
         observer.checkAndFetch();
     }
+    // 处理错误边界
+    // if (result.error) {
+    //     throw result.error
+    // }
     return observer.trackResult(result);
 }
