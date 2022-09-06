@@ -90,18 +90,22 @@ export class Query {
         }
     }
     // 创建retryer  发起请求
-    fetch(options: QueryOptions): Promise<any> {
+    fetch(options: QueryOptions): Promise<any> | Error {
         // 更新options
         if (options) {
             this.updateOptions(options)
         }
         //todo 如果没指定fn  执行上一次的fn(options中保存)
         if (!this.options.queryFn) {
-            return Promise.reject('Missing queryFn')
+            const error = new Error('Missing queryFn')
+            this.dispatch({ type: 'error', error })
+            return error
         }
         // queryKey需要数组
         if (!Array.isArray(this.options.queryKey)) {
-            throw new Error(' queryKey需要是一个数组')
+            const error = new Error('queryKey需要是一个数组')
+            this.dispatch({ type: 'error', error })
+            return error
         }
         //todo 创建一个fetchFn
         const fetchFn = this.options.queryFn
@@ -153,14 +157,13 @@ export class Query {
     // 重新请求
     refetch(options: QueryOptions) {
         this.stopFetch()
-        this.fetch(options)
+        return this.fetch(options)
     }
     // 根据action创建创建不同的reducer 来修改当前query的状态
     private dispatch(action: Action): void {
         const reducer = (state: QueryState): QueryState => {
             switch (action.type) {
                 case 'fetch':
-                    console.log('发起请求事件');
                     return {
                         ...state,
                         fetchFailureCount: 0,
@@ -168,7 +171,6 @@ export class Query {
                         status: 'loading'
                     }
                 case 'success':
-                    console.log('请求成功事件');
                     return {
                         ...state,
                         data: action.data,
@@ -179,30 +181,25 @@ export class Query {
                         fetchStatus: 'idle'
                     }
                 case 'failed':
-                    console.log('请求失败事件');
                     return {
                         ...state,
                         fetchFailureCount: state.fetchFailureCount + 1,
                     }
                 case 'error':
-                    const error = action.error
-                    console.log('请求错误事件');
                     return {
                         ...state,
-                        error: error,
+                        error: action.error,
                         errorUpdateCount: state.errorUpdateCount + 1,
                         fetchFailureCount: state.fetchFailureCount + 1,
                         status: 'error',
                         fetchStatus: 'idle'
                     }
                 case 'pause':
-                    console.log('请求暂停事件');
                     return {
                         ...state,
                         fetchStatus: 'paused',
                     }
                 case 'continue':
-                    console.log('请求继续事件');
                     return {
                         ...state,
                         fetchStatus: 'fetching',
@@ -211,7 +208,7 @@ export class Query {
         }
 
         this.state = reducer(this.state) //修改query的state
-        console.log('执行成功  更改state', action);
+        console.log('dispatch成功  更改state, Action:', action);
 
         // 通知所有的observer  state更新了  observer重新渲染组件
         this.observers.forEach((observer) => {

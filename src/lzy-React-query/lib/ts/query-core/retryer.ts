@@ -56,6 +56,7 @@ export function createRetryer(config: RetryerConfig) {
         // 执行函数  获取结果或者抛出promise错误
         let promiseOrValue;
         try {
+            console.log('--------tryFetch/retryFetch-------');
             promiseOrValue = config.fn() //!Promise.resolve()  执行queryFn 
         } catch (err) {
             promiseOrValue = Promise.reject(err)

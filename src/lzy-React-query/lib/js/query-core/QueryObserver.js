@@ -25,13 +25,18 @@ export class QueryObserver extends Subscribable {
         this.trackedProps = new Set(); // 被用户使用的result中的属性  进行跟踪
         this.initObserver(options); // 初始化
     }
-    refetch() { }
+    // 删除当前query
     remove() {
         this.client.getQueryCache().removeQuery(this.currentQuery);
     }
     // 调用Query发起请求
     fetch() {
         let promise = this.currentQuery.fetch(this.options);
+        return promise;
+    }
+    //todo 调用Query重新请求(先返回一个新result)
+    refetch() {
+        let promise = this.currentQuery.refetch(this.options);
         return promise;
     }
     // 检查后再调用Query发起请求
@@ -58,11 +63,11 @@ export class QueryObserver extends Subscribable {
         if (prevOptions.queryKey[0] !== nextOptions.queryKey[0]) {
             this.initObserver(nextOptions);
         }
-        // 切换queryFn 进行通知 重新发起请求
+        // 切换queryFn 
         else if (prevOptions.queryFn !== nextOptions.queryFn) {
-            this.currentQuery.refetch(nextOptions);
+            // this.currentQuery.refetch(nextOptions)
         }
-        // 切换callBack 进行通知
+        // 切换callBack 
         else if (prevOptions.onError !== nextOptions.onError) {
             // do nothing
         }
@@ -118,7 +123,7 @@ export class QueryObserver extends Subscribable {
                 return changed && this.trackedProps.has(typedKey);
             });
             console.log('跟踪的props是否发生变化(是否可以重渲染组件??)', trackedPropChanged);
-            // console.log(prevResult, nextResult);
+            console.log(prevResult, nextResult);
         }
         this.currentResult = nextResult;
         if (mountResult || trackedPropChanged) {
@@ -144,7 +149,7 @@ export class QueryObserver extends Subscribable {
             fetchStatus,
             error,
             isStale: query.isStale.bind(query, this.options.staleTime),
-            refetch: this.refetch,
+            refetch: this.refetch.bind(this),
             remove: this.remove,
         };
         return result;
@@ -182,15 +187,18 @@ export class QueryObserver extends Subscribable {
         }
         this.updateResult();
     }
-    // 追踪result上的属性(用户是否访问)
+    // 追踪result上的属性(用户是否访问)   // 去除isStale的追踪(每次都会改变)
     trackResult(result) {
         const trackedResult = {};
+        const unTrackProps = ['isStale', 'refetch'];
         Object.keys(result).forEach((key) => {
             Object.defineProperty(trackedResult, key, {
                 configurable: false,
                 enumerable: true,
                 get: () => {
-                    this.trackedProps.add(key);
+                    if (unTrackProps.indexOf(key) === -1) {
+                        this.trackedProps.add(key);
+                    }
                     return result[key];
                 },
             });
@@ -199,9 +207,6 @@ export class QueryObserver extends Subscribable {
     }
     // 给listeners发送通知 进行更新 (这里的Listener就是React的setState  调用执行组件render)
     notifyListeners() {
-        const needNotify = this.currentResult.status !== 'loading';
-        if (!needNotify)
-            return;
         this.listeners.forEach((listener) => {
             listener(this.currentResult);
         });

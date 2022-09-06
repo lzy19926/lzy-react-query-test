@@ -14,7 +14,7 @@ function getDefaultOptions() {
     return {
         queryKey: [],
         retry: 3,
-        retryDelay: 1000,
+        retryDelay: 100,
         staleTime: 5000,
         cacheTime: 3 * 60 * 1000,
         autoFetchInterval: false

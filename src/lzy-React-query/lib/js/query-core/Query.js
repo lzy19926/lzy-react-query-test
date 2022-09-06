@@ -80,11 +80,15 @@ export class Query {
         }
         //todo 如果没指定fn  执行上一次的fn(options中保存)
         if (!this.options.queryFn) {
-            return Promise.reject('Missing queryFn');
+            const error = new Error('Missing queryFn');
+            this.dispatch({ type: 'error', error });
+            return error;
         }
         // queryKey需要数组
         if (!Array.isArray(this.options.queryKey)) {
-            throw new Error(' queryKey需要是一个数组');
+            const error = new Error('queryKey需要是一个数组');
+            this.dispatch({ type: 'error', error });
+            return error;
         }
         //todo 创建一个fetchFn
         const fetchFn = this.options.queryFn;
@@ -133,7 +137,7 @@ export class Query {
     // 重新请求
     refetch(options) {
         this.stopFetch();
-        this.fetch(options);
+        return this.fetch(options);
     }
     // 根据action创建创建不同的reducer 来修改当前query的状态
     dispatch(action) {
@@ -141,28 +145,21 @@ export class Query {
             var _a;
             switch (action.type) {
                 case 'fetch':
-                    console.log('发起请求事件');
                     return Object.assign(Object.assign({}, state), { fetchFailureCount: 0, fetchStatus: 'fetching', status: 'loading' });
                 case 'success':
-                    console.log('请求成功事件');
                     return Object.assign(Object.assign({}, state), { data: action.data, dataUpdateCount: state.dataUpdateCount + 1, dataUpdatedAt: (_a = action.dataUpdatedAt) !== null && _a !== void 0 ? _a : Date.now(), error: null, status: 'success', fetchStatus: 'idle' });
                 case 'failed':
-                    console.log('请求失败事件');
                     return Object.assign(Object.assign({}, state), { fetchFailureCount: state.fetchFailureCount + 1 });
                 case 'error':
-                    const error = action.error;
-                    console.log('请求错误事件');
-                    return Object.assign(Object.assign({}, state), { error: error, errorUpdateCount: state.errorUpdateCount + 1, fetchFailureCount: state.fetchFailureCount + 1, status: 'error', fetchStatus: 'idle' });
+                    return Object.assign(Object.assign({}, state), { error: action.error, errorUpdateCount: state.errorUpdateCount + 1, fetchFailureCount: state.fetchFailureCount + 1, status: 'error', fetchStatus: 'idle' });
                 case 'pause':
-                    console.log('请求暂停事件');
                     return Object.assign(Object.assign({}, state), { fetchStatus: 'paused' });
                 case 'continue':
-                    console.log('请求继续事件');
                     return Object.assign(Object.assign({}, state), { fetchStatus: 'fetching' });
             }
         };
         this.state = reducer(this.state); //修改query的state
-        console.log('执行成功  更改state', action);
+        console.log('dispatch成功  更改state, Action:', action);
         // 通知所有的observer  state更新了  observer重新渲染组件
         this.observers.forEach((observer) => {
             observer.onQueryUpdate(action);
