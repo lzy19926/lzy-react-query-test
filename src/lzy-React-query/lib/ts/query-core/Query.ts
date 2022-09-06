@@ -3,7 +3,6 @@ import { QueryObserver } from './QueryObserver'
 import { QueryKey, QueryOptions, QueryState, Action, Retryer, QueryConfig } from './types'
 import { getDefaultQueryState } from './types'
 import { createRetryer } from './retryer'
-import { log } from 'console'
 
 // Query是react-query底层核心类，它负责网络数据请求、状态变化的处理、以及内存回收工作。
 //Query给Retryer指定fn（请求函数主体）、retry（重试次数）、retryDelay（重试延迟时间），以及一系列状态变化回调函数（比如onSuccess、onPause等）。
@@ -15,6 +14,7 @@ import { log } from 'console'
 
 export class Query {
     queryKey: QueryKey
+    queryHash: number
     options: QueryOptions
     state: QueryState
     private cache: QueryCache
@@ -28,8 +28,9 @@ export class Query {
         this.observers = []
         this.cache = config.cache
         this.queryKey = config.queryKey
+        this.queryHash = config.queryHash
         this.state = config.state || getDefaultQueryState()
-        console.log('创建Query', config.options.queryKey);
+        console.log('创建Query', config.queryKey, config.queryHash);
         this.updateGCTimer()
     }
 
@@ -38,10 +39,15 @@ export class Query {
         const removeUndefinedOptions = Object.fromEntries(Object.entries(options).filter(([_, v]) => v != null));
         this.options = { ...this.options, ...removeUndefinedOptions }
     }
-    // 装载垃圾回收器 (缓存时间到后删除Query)
+    // 更新垃圾回收器 (缓存时间到后删除Query)
     updateGCTimer() {
         const cacheTime = this.options.cacheTime
         if (!cacheTime) return
+
+        if (this.GCtimer) {
+            clearTimeout(this.GCtimer)
+        }
+
         this.GCtimer = setTimeout(() => {
             console.log('垃圾回收');
             // this.destory()
@@ -70,6 +76,10 @@ export class Query {
     removeObserver(observer: QueryObserver) {
         if (this.observers.indexOf(observer) !== -1) {
             this.observers = this.observers.filter((x) => x !== observer)
+        }
+        if (!this.observers.length) {//没有ob时 终止请求,重启垃圾回收
+            this.stopFetch()
+            this.updateGCTimer()
         }
     }
     // Query自我销毁(无observer时销毁)
@@ -136,7 +146,15 @@ export class Query {
 
         return this.promise
     }
-
+    // 停止retryer请求
+    stopFetch() {
+        this.retryer?.cancleRetry()
+    }
+    // 重新请求
+    refetch(options: QueryOptions) {
+        this.stopFetch()
+        this.fetch(options)
+    }
     // 根据action创建创建不同的reducer 来修改当前query的状态
     private dispatch(action: Action): void {
         const reducer = (state: QueryState): QueryState => {
@@ -193,6 +211,7 @@ export class Query {
         }
 
         this.state = reducer(this.state) //修改query的state
+        console.log('执行成功  更改state', action);
 
         // 通知所有的observer  state更新了  observer重新渲染组件
         this.observers.forEach((observer) => {

@@ -1,9 +1,7 @@
 import type { QueryCache } from "./QueryCache"
 export type QueryStatus = 'loading' | 'error' | 'success'
 export type FetchStatus = 'fetching' | 'paused' | 'idle'
-
 export type QueryFunction = (...params: any) => Promise<any>
-
 export type QueryKey = string[]
 export interface FetchOptions {
     retry?: number | false, //失败是否重复请求(请求次数)
@@ -25,6 +23,7 @@ export interface QueryOptions extends FetchOptions {
 export interface QueryConfig {
     cache: QueryCache
     queryKey: QueryKey
+    queryHash: number
     options: QueryOptions
     state?: QueryState
 }
@@ -39,7 +38,6 @@ export interface QueryState {
     status: QueryStatus  //结果状态
     fetchStatus: FetchStatus// 查询状态
 }
-
 
 interface FailedAction {
     type: 'failed'
@@ -74,6 +72,8 @@ export type Action =
 
 export interface Retryer {
     promise: Promise<any>
+    cancleRetry: () => void,
+    continueRetry: () => void,
 }
 
 function getDefaultQueryState(): QueryState {

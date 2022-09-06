@@ -11,9 +11,9 @@ export class QueryClient {
     getQueryCache() {
         return this.queryCache;
     }
-    getQueryData(queryKey) {
+    getQueryData(options) {
         var _a;
-        return (_a = this.queryCache.findQuery(queryKey)) === null || _a === void 0 ? void 0 : _a.state.data;
+        return (_a = this.queryCache.findQuery(options)) === null || _a === void 0 ? void 0 : _a.state.data;
     }
     fetchQuery(queryOptions) {
         // 给与retry默认值

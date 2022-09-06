@@ -1,6 +1,7 @@
 import React from "react";
 import { useQuery } from '../lzy-React-query/index'
 import { render, waitFor } from '@testing-library/react'
+import { QueryFunction } from "../lzy-React-query/lib/ts/query-core/types";
 
 
 // 延迟函数
@@ -17,6 +18,10 @@ const queryFnSuccess = async () => {
 const queryFnUnsuccess = async () => {
     await sleep(10)
     return Promise.reject('rejected')
+}
+const selectQueryFn = (res: string): any => {
+    if (res === 'success') return queryFnSuccess
+    if (res === 'fail') return queryFnUnsuccess
 }
 
 // 每个测试结束需要重置全局Client
@@ -134,6 +139,29 @@ describe('useQuery', () => {
         expect(onSuccess).toHaveBeenCalledWith('testData')
     })
 
+    it('should call onSuccess after a query has been refetched', async () => {
+        const key = ['queryKey_1']
+        const states: any[] = []
+        const onSuccess = jest.fn()
+        const onFail = jest.fn()
+        let queryRes = 'fail' // 第一次为fail 第二次为success
+
+        function Page() {
+            let queryFn = selectQueryFn(queryRes)
+            queryRes = 'success'
+            const state = useQuery(key, queryFn, { retry: 3, retryDelay: 10, onSuccess, onFail })
+            states.push(state)
+            return <div>Status:{state.status}</div>
+        }
+
+        const rendered = render(<Page />)
+
+        await rendered.findByText('Status:error')
+        expect(onFail).toHaveBeenCalledTimes(1)
+        expect(onSuccess).toHaveBeenCalledTimes(1)
+        expect(onSuccess).toHaveBeenCalledWith('testData')
+    })
+
     it('失败retry次数测试', async () => {
         const key = ['queryKey_1']
         const states: any[] = []
@@ -184,6 +212,8 @@ describe('useQuery', () => {
         await rendered.findByText('Status:error')
         expect(onError).toHaveBeenCalledTimes(1)
     })
+
+
 
 })
 

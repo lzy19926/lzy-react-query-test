@@ -5,6 +5,7 @@ import { sleep } from './utils';
 //todo  如果没有正常获得数据  不会执行自己封装的resolve/reject  此时会进入retry逻辑 重复发起请求  达到上限后直接执行reject  停止请求
 //todo  这里相当于截断了promise的执行流程   执行res之前先执行回调
 export function createRetryer(config) {
+    let isRetryCancelled = false;
     let failureCount = 0;
     let isResolved = false; //执行了自定义的res或rej后会改变  之后不会继续执行
     let promiseResolve = (value) => { };
@@ -35,9 +36,8 @@ export function createRetryer(config) {
         (_a = config.onError) === null || _a === void 0 ? void 0 : _a.call(config, value);
         promiseReject(value); // 执行所有.catch中定义的onReject函数
     };
-    // 启动retryer会执行run方法   开始查询循环   中途如果出现变化(接收到数据)  返回数据或做其他处理
     const run = () => {
-        if (isResolved)
+        if (!shouldRun())
             return;
         // 执行函数  获取结果或者抛出promise错误
         let promiseOrValue;
@@ -51,30 +51,44 @@ export function createRetryer(config) {
         Promise.resolve(promiseOrValue)
             .then(resolve) // 首先调用resolve返回结果
             .catch((error) => {
+            if (!shouldRetry())
+                return reject(error);
             if (isResolved)
                 return;
             retry(error);
         });
     };
     const retry = (error) => {
-        var _a, _b, _c;
-        const retry = (_a = config.retry) !== null && _a !== void 0 ? _a : 3;
-        const retryDelay = (_b = config.retryDelay) !== null && _b !== void 0 ? _b : 3000;
-        const shouldRetry = config.retry === true || failureCount < retry;
-        // 如果重复次数到上限 或者 配置为false  直接执行reject
-        if (!shouldRetry)
-            return reject(error);
+        var _a;
         // 如果需要重复  计数器++ 执行onFail回调
+        const delay = config.retryDelay || 3000;
         failureCount++;
-        (_c = config.onFail) === null || _c === void 0 ? void 0 : _c.call(config, error);
+        (_a = config.onFail) === null || _a === void 0 ? void 0 : _a.call(config, error);
         // 延迟后再次执行请求
-        sleep(retryDelay).then(() => {
+        sleep(delay).then(() => {
             run();
         });
+    };
+    const shouldRun = () => {
+        return !isResolved && !isRetryCancelled;
+    };
+    const shouldRetry = () => {
+        var _a;
+        const retry = (_a = config.retry) !== null && _a !== void 0 ? _a : 3;
+        const shouldRetry = !isRetryCancelled && (config.retry === true || failureCount < retry);
+        return shouldRetry;
+    };
+    const cancleRetry = () => {
+        isRetryCancelled = true;
+    };
+    const continueRetry = () => {
+        isRetryCancelled = false;
     };
     // 开始执行循环
     run();
     return {
-        promise
+        promise,
+        cancleRetry,
+        continueRetry
     };
 }

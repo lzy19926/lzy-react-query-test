@@ -11,8 +11,9 @@ export class Query {
         this.observers = [];
         this.cache = config.cache;
         this.queryKey = config.queryKey;
+        this.queryHash = config.queryHash;
         this.state = config.state || getDefaultQueryState();
-        console.log('创建Query', config.options.queryKey);
+        console.log('创建Query', config.queryKey, config.queryHash);
         this.updateGCTimer();
     }
     // 更新上一次的options
@@ -20,11 +21,14 @@ export class Query {
         const removeUndefinedOptions = Object.fromEntries(Object.entries(options).filter(([_, v]) => v != null));
         this.options = Object.assign(Object.assign({}, this.options), removeUndefinedOptions);
     }
-    // 装载垃圾回收器 (缓存时间到后删除Query)
+    // 更新垃圾回收器 (缓存时间到后删除Query)
     updateGCTimer() {
         const cacheTime = this.options.cacheTime;
         if (!cacheTime)
             return;
+        if (this.GCtimer) {
+            clearTimeout(this.GCtimer);
+        }
         this.GCtimer = setTimeout(() => {
             console.log('垃圾回收');
             // this.destory()
@@ -55,6 +59,10 @@ export class Query {
     removeObserver(observer) {
         if (this.observers.indexOf(observer) !== -1) {
             this.observers = this.observers.filter((x) => x !== observer);
+        }
+        if (!this.observers.length) { //没有ob时 终止请求,重启垃圾回收
+            this.stopFetch();
+            this.updateGCTimer();
         }
     }
     // Query自我销毁(无observer时销毁)
@@ -117,6 +125,16 @@ export class Query {
         this.promise = this.retryer.promise;
         return this.promise;
     }
+    // 停止retryer请求
+    stopFetch() {
+        var _a;
+        (_a = this.retryer) === null || _a === void 0 ? void 0 : _a.cancleRetry();
+    }
+    // 重新请求
+    refetch(options) {
+        this.stopFetch();
+        this.fetch(options);
+    }
     // 根据action创建创建不同的reducer 来修改当前query的状态
     dispatch(action) {
         const reducer = (state) => {
@@ -144,6 +162,7 @@ export class Query {
             }
         };
         this.state = reducer(this.state); //修改query的state
+        console.log('执行成功  更改state', action);
         // 通知所有的observer  state更新了  observer重新渲染组件
         this.observers.forEach((observer) => {
             observer.onQueryUpdate(action);

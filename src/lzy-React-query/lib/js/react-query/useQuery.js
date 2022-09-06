@@ -21,6 +21,10 @@ export function useQuery(keys, queryFn, options, outerQueryClient) {
     //构建一个新的Observer  放入useState的都会重复引用  (使用同一个render或observer)  在组件的整个生命周期内共享一个observer
     //new Observer的同时会发起第一次请求
     const [observer] = React.useState(() => new QueryObserver(queryClient, parsedOptions));
+    //监视options变更(每次render都会触发  因为每个传入的options引用不一样)
+    React.useEffect(() => {
+        observer.handleOptionsChange(parsedOptions);
+    }, [parsedOptions]);
     // 创建reRender触发器(updater)  推入listener中 Observer通知组件更新时会触发所有的updater
     const reRenderer = React.useState(undefined)[1];
     observer.subscribe(reRenderer);

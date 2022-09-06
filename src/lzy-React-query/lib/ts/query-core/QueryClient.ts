@@ -21,8 +21,8 @@ export class QueryClient {
         return this.queryCache
     }
 
-    getQueryData(queryKey: string) {
-        return this.queryCache.findQuery(queryKey)?.state.data
+    getQueryData(options: QueryOptions) {
+        return this.queryCache.findQuery(options)?.state.data
     }
 
     fetchQuery(queryOptions: QueryOptions) {

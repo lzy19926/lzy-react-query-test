@@ -1,3 +1,4 @@
+import { QueryCache } from './QueryCache';
 import { QueryStatus, FetchStatus, QueryOptions, Action } from './types'
 import type { QueryClient } from './QueryClient'
 import type { Query } from './Query'
@@ -56,7 +57,7 @@ export class QueryObserver extends Subscribable {
         this.client = client // client中保存了cache
         this.options = options
         this.trackedProps = new Set() // 被用户使用的result中的属性  进行跟踪
-        this.initObserver() // 初始化
+        this.initObserver(options) // 初始化
     }
 
     refetch() { }
@@ -79,20 +80,54 @@ export class QueryObserver extends Subscribable {
     }
 
     // 根据options初始化observer(创建初始query 初始请求 创建初始result)
-    initObserver() {
-        this.updateQuery(this.options)// 初始化query 
+    initObserver(newOption: QueryOptions) {
+        this.updateOptions(newOption)  // 更新options
+        this.updateCurrentQuery(newOption)// 更新query 
         this.checkAndFetch() // 初始请求
         this.updateResult() // 初始化result
         this.updateAutoFetchInterval() // 初始化轮询
     }
 
-    // 创建/查询并更新currnetQuery 给query添加observer
-    updateQuery(options: QueryOptions) {
+    //! 处理options发生变化的清空 需要注意 React闭包陷阱  每个render闭包内的函数都是上一个引用
+    handleOptionsChange(options: QueryOptions) {
+        const prevOptions = this.options
+        const nextOptions = options
+
+        this.updateOptions(nextOptions)
+
+        // 切换query 重新初始化observer
+        if (prevOptions.queryKey[0] !== nextOptions.queryKey[0]) {
+            this.initObserver(nextOptions)
+        }
+        // 切换queryFn 进行通知 重新发起请求
+        else if (prevOptions.queryFn !== nextOptions.queryFn) {
+            this.currentQuery.refetch(nextOptions)
+        }
+        // 切换callBack 进行通知
+        else if (prevOptions.onError !== nextOptions.onError) {
+            // do nothing
+        }
+    }
+
+    //如果options发生更新  更新options
+    updateOptions(newOption: QueryOptions) {
+        if (newOption === this.options) return
+        this.options = newOption
+    }
+
+    // 创建/查询/更新currnetQuery ( 给query添加observer)
+    updateCurrentQuery(options: QueryOptions) {
         const query = this.client.getQueryCache().getQuery(options)
         if (!query) { throw new Error('没有生成query,请检查queryKey') }
-        if (this.currentQuery === query) return
-        this.currentQuery = query
-        query.addObserver(this)
+
+        const prevQuery = this.currentQuery as Query | undefined
+        const nextQuery = query
+        if (prevQuery !== nextQuery) {
+            nextQuery.addObserver(this)
+            prevQuery?.removeObserver(this)
+            this.currentQuery = nextQuery
+        }
+
         return query
     }
 
@@ -126,6 +161,7 @@ export class QueryObserver extends Subscribable {
                 return changed && this.trackedProps.has(typedKey)
             })
             console.log('跟踪的props是否发生变化(是否可以重渲染组件??)', trackedPropChanged);
+            // console.log(prevResult, nextResult);
         }
 
         this.currentResult = nextResult
@@ -167,9 +203,7 @@ export class QueryObserver extends Subscribable {
     // 创建一个result返回(如果发现Query更新了,重新initObserver)
     getResult(options: QueryOptions): QueryObserverResult {
         const query = this.client.getQueryCache().getQuery(options)
-        if (query !== this.currentQuery) {
-            this.initObserver()
-        }
+
         return this.createResult(query, options)
     }
 
