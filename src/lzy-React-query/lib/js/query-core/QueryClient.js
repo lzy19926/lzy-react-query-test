@@ -15,6 +15,19 @@ export class QueryClient {
         var _a;
         return (_a = this.queryCache.findQuery(options)) === null || _a === void 0 ? void 0 : _a.state.data;
     }
+    getAllQueryData() {
+        var _a;
+        const querys = this.queryCache.getQueries();
+        const res = {};
+        for (let hash in querys) {
+            const { queryKey, state } = querys[hash];
+            const key = queryKey[0];
+            const data = state === null || state === void 0 ? void 0 : state.data;
+            const url = (_a = state === null || state === void 0 ? void 0 : state.data) === null || _a === void 0 ? void 0 : _a.request.responseURL;
+            Object.assign(res, { [key]: { data, url } });
+        }
+        return res;
+    }
     fetchQuery(queryOptions) {
         // 给与retry默认值
         if (typeof (queryOptions === null || queryOptions === void 0 ? void 0 : queryOptions.retry) === 'undefined') {

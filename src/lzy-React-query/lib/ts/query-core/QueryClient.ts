@@ -25,6 +25,19 @@ export class QueryClient {
         return this.queryCache.findQuery(options)?.state.data
     }
 
+    getAllQueryData() {
+        const querys = this.queryCache.getQueries()
+        const res = {}
+        for (let hash in querys) {
+            const { queryKey, state } = querys[hash]
+            const key = queryKey[0]
+            const data = state?.data
+            const url = state?.data?.request.responseURL
+            Object.assign(res, { [key]: { data, url } })
+        }
+        return res
+    }
+
     fetchQuery(queryOptions: QueryOptions) {
         // 给与retry默认值
         if (typeof queryOptions?.retry === 'undefined') {

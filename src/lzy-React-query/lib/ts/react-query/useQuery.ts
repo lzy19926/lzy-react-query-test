@@ -1,5 +1,4 @@
 import { QueryClient } from './../query-core/QueryClient';
-import { log } from 'console';
 import { QueryObserver, QueryObserverResult } from '../query-core/QueryObserver'
 import { useQueryClient } from './useQueryClient'
 import { QueryKey, QueryFunction, FetchOptions, } from '../query-core/types'

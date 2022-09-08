@@ -1,18 +1,12 @@
 import React from 'react';
-import { useQuery } from './lzy-React-query/index'
+import { useQuery } from '../lzy-React-query/index'
 import { getUser, queryFnSuccess, queryFnFail, queryFnUndefined } from './queryFn'
 import { useState } from 'react';
 
 
 
 
-const key = ['queryKey_1']
-const states: any[] = []
-
-
-
-
-function App() {
+export default function UseQuery() {
   console.log('---------render-----------');
   const callbacks = {
     onSuccess: (data: any) => {
@@ -28,10 +22,8 @@ function App() {
 
 
   const { data, status, isStale, refetch } = useQuery(
-    key,
-    // queryFnSuccess,
-    // queryFnUndefined,
-    queryFnFail,
+    ['queryKey_1'],
+    getUser,
     {
       retry: 3,
       retryDelay: 500,
@@ -54,9 +46,6 @@ function App() {
 
 
 
-export default App
-
-
 
 // cacheTime 缓存时间到后清除Query  同时通知cache进行清除(大问题)
 //  刷新页面window会重置  client也会重置   需要修改
@@ -67,7 +56,7 @@ export default App
 // queryKey需要hash化
 // 修复isStale引用变化问题(bind)
 
-
+//!!!! todo 多个hook适配！！！！！！
 //todo 组件未mount时不发起请求
 //todo  enable条件查询开发
 //todo  需要判断网络状态 如果online才发生请求

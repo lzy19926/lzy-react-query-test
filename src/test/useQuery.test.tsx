@@ -1,7 +1,7 @@
 import React from "react";
 import { useQuery } from '../lzy-React-query/index'
-import { render, waitFor } from '@testing-library/react'
-import { QueryFunction } from "../lzy-React-query/lib/ts/query-core/types";
+import { render, waitFor, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event';
 
 
 // 延迟函数
@@ -11,15 +11,17 @@ function sleep(timeout: number): Promise<void> {
     })
 }
 // 请求函数
+let queryCount = 0
 const queryFnSuccess = async () => {
+    queryCount++
     await sleep(10)
     return Promise.resolve('testData')
 }
 const queryFnUnsuccess = async () => {
+    queryCount++
     await sleep(10)
     return Promise.reject('rejected')
 }
-let queryCount = 0
 const queryAfterSuccess = async () => {
     await sleep(10)
     if (queryCount === 0) {
@@ -32,6 +34,7 @@ const queryAfterSuccess = async () => {
     }
 }
 const queryFnUndefined = async () => {
+    queryCount++
     await sleep(10)
     return Promise.resolve(undefined)
 }
@@ -44,6 +47,7 @@ beforeEach(() => {
 })
 afterEach(() => {
     queryCount = 0
+    jest.clearAllTimers()
     window.LzyReactQueryClient = undefined
 })
 
@@ -177,13 +181,6 @@ describe('useQuery', () => {
     it('失败后应该执行retry次数的请求', async () => {
         const key = ['queryKey_1']
         const states: any[] = []
-        let count = 0
-
-        const queryFnUnsuccess = async () => {
-            count++
-            await sleep(10)
-            return Promise.reject('rejected')
-        }
 
         function Page() {
             const state = useQuery(key, queryFnUnsuccess, { retry: 3, retryDelay: 10 })
@@ -192,7 +189,21 @@ describe('useQuery', () => {
 
         const rendered = render(<Page />)
         await rendered.findByText('Status:error')
-        expect(count).toBe(4)
+        expect(queryCount).toBe(4)
+    })
+
+    it('retry设置为false时不执行', async () => {
+        const key = ['queryKey_1']
+        const states: any[] = []
+
+        function Page() {
+            const state = useQuery(key, queryFnUnsuccess, { retry: false, retryDelay: 10 })
+            return <div>Status:{state.status}</div>
+        }
+
+        const rendered = render(<Page />)
+        await rendered.findByText('Status:error')
+        expect(queryCount).toBe(1)
     })
 
     it('失败retry后应该执行onFail回调', async () => {
@@ -243,24 +254,24 @@ describe('useQuery', () => {
         expect(onError).toHaveBeenCalledWith(new Error('Query data cannot be undefined'))
     })
 
-    it('没有queryFn时应展示错误', async () => {
-        const key = ['queryKey_1']
-        const states: any[] = []
-        const onError = jest.fn()
+    // it('没有queryFn时应展示错误', async () => {
+    //     const key = ['queryKey_1']
+    //     const states: any[] = []
+    //     const onError = jest.fn()
 
-        function Page() {
-            const state = useQuery(key, null, { retry: 3, retryDelay: 10, onError })
-            states.push(state)
-            return <div>Status:{state.status}</div>
-        }
+    //     function Page() {
+    //         const state = useQuery(key, null, { retry: 3, retryDelay: 10, onError })
+    //         states.push(state)
+    //         return <div>Status:{state.status}</div>
+    //     }
 
-        const rendered = render(<Page />)
-        await rendered.findByText('Status:error')
-        expect(states[0].error).toEqual(new Error('Missing queryFn'))
-        expect(onError).toHaveBeenCalledTimes(1)
-        expect(onError).toHaveBeenCalledWith(new Error('Missing queryFn'))
+    //     const rendered = render(<Page />)
+    //     await rendered.findByText('Status:error')
+    //     expect(states[0].error).toEqual(new Error('Missing queryFn'))
+    //     expect(onError).toHaveBeenCalledTimes(1)
+    //     expect(onError).toHaveBeenCalledWith(new Error('Missing queryFn'))
 
-    })
+    // })
 
     it('组件unmount时不应执行onSuccess', async () => {
         const key = ['queryKey_1']
@@ -315,33 +326,318 @@ describe('useQuery', () => {
         }, 3000)
 
         jest.runAllTimers();// 快进 立即执行所有定时器
+        jest.clearAllTimers()
     })
 
-    it('staleTime过期后,render页面重新发起请求', async () => { })
+    it('状态为success时,数据不新鲜时,render页面重新发起请求', async () => {
+        jest.useFakeTimers();
 
-    it('手动执行refetch后重启success请求并返回正确结果', async () => { })
+        const key = ['queryKey_1']
+        const states: any[] = []
 
-    it('手动执行refetch后重启fail请求并返回正确结果', async () => { })
+        function Page() {
+            const [num, setNum] = React.useState(0)
+            const state = useQuery(key, queryFnSuccess, { staleTime: 2000 })
+            states.push(state)
+            return (<>
+                <div>Status:{state.status}</div>
+                <button onClick={() => { setNum(num + 1) }}>click Render</button>
+            </>)
+        }
+        const rendered = render(<Page />)
+        await rendered.findByText('Status:success')
+        expect(queryCount).toEqual(1)
 
-    it('手动执行refetch后重启error请求并返回正确结果', async () => { })
+        setTimeout(async () => {
+            userEvent.click(screen.getByText('click Render'))
+            rendered.findByText('Status:loading')
+            expect(queryCount).toEqual(2)
+        }, 3000)
 
-    it('手动执行refetch后执行success回调', async () => { })
-    it('手动执行refetch后执行fail回调', async () => { })
-    it('手动执行refetch后执行error回调', async () => { })
+        jest.runAllTimers();
+    })
+
+    it('状态为success时,数据依然新鲜,render页面不重新发起请求', async () => {
+        jest.useFakeTimers();
+
+        const key = ['queryKey_1']
+        const states: any[] = []
+
+        function Page() {
+            const [num, setNum] = React.useState(0)
+            const state = useQuery(key, queryFnSuccess, { staleTime: 2000 })
+            states.push(state)
+            return (<>
+                <div>Status:{state.status}</div>
+                <button onClick={() => { setNum(num + 1) }}>click Render</button>
+            </>)
+        }
+        const rendered = render(<Page />)
+        await rendered.findByText('Status:success')
+        expect(queryCount).toEqual(1)
+
+        setTimeout(() => {
+            userEvent.click(screen.getByText('click Render'))
+            rendered.findByText('Status:success')
+            expect(queryCount).toEqual(1)
+        }, 1000)
+
+        setTimeout(async () => {
+            userEvent.click(screen.getByText('click Render'))
+            rendered.findByText('Status:loading')
+            expect(queryCount).toEqual(2)
+        }, 3000)
+
+        jest.runAllTimers();// 快进 立即执行所有定时器
+
+    })
+
+    it('状态为error时,无论是否新鲜,render页面不重新发起请求', async () => {
+        jest.useFakeTimers();
+
+        const key = ['queryKey_1']
+        const states: any[] = []
+
+        function Page() {
+            const [num, setNum] = React.useState(0)
+            const state = useQuery(key, queryFnUnsuccess, { retry: false, retryDelay: 10, staleTime: 2000 })
+            states.push(state)
+            return (<>
+                <div>Status:{state.status}</div>
+                <button onClick={() => { setNum(num + 1) }}>click Render</button>
+            </>)
+        }
+        const rendered = render(<Page />)
+        await rendered.findByText('Status:error')
+        expect(queryCount).toEqual(1)
+
+        setTimeout(() => {
+            userEvent.click(screen.getByText('click Render'))
+            rendered.findByText('Status:error')
+            expect(queryCount).toEqual(1)
+        }, 1000)
+
+        setTimeout(async () => {
+            userEvent.click(screen.getByText('click Render'))
+            rendered.findByText('Status:error')
+            expect(queryCount).toEqual(1)
+        }, 3000)
+
+        jest.runAllTimers();// 快进 立即执行所有定时器
+    })
+
+    it('手动执行refetch后发起请求', async () => {
+        const key = ['queryKey_1']
+        const states: any[] = []
+
+        function Page() {
+            const [num, setNum] = React.useState(0)
+            const state = useQuery(key, queryFnSuccess, { staleTime: 2000 })
+            states.push(state)
+            return (<>
+                <div>Status:{state.status}</div>
+                <button onClick={() => { state.refetch() }}>Refetch</button>
+            </>)
+        }
+        const rendered = render(<Page />)
+        await rendered.findByText('Status:success')
+        expect(queryCount).toEqual(1)
+
+        await userEvent.click(screen.getByText('Refetch'))
+        await rendered.findByText('Status:success')
+        expect(queryCount).toEqual(2)
+    })
+
+    it('手动执行refetch后重启success请求并返回正确结果', async () => {
+        const key = ['queryKey_1']
+        const states: any[] = []
+
+        function Page() {
+            const state = useQuery(key, queryFnSuccess, { staleTime: 2000 })
+            states.push(state)
+            return (<>
+                <div>Status:{state.status}</div>
+                <button onClick={() => { state.refetch() }}>Refetch</button>
+            </>)
+        }
+        const rendered = render(<Page />)
+        await rendered.findByText('Status:success')
+        expect(queryCount).toEqual(1)
+        expect(states.length).toEqual(2)
+        await userEvent.click(screen.getByText('Refetch'))
+        await rendered.findByText('Status:success')
+        expect(queryCount).toEqual(2)
+        expect(states.length).toEqual(4)
+
+
+        expect(states[0]).toEqual({
+            data: undefined,
+            status: 'loading',
+            fetchStatus: 'fetching',
+            error: null,
+            isStale: expect.any(Function),
+            refetch: expect.any(Function),
+            remove: expect.any(Function),
+        })
+        expect(states[1]).toEqual({
+            data: 'testData',
+            status: 'success',
+            fetchStatus: 'idle',
+            error: null,
+            isStale: expect.any(Function),
+            refetch: expect.any(Function),
+            remove: expect.any(Function),
+        })
+        expect(states[2]).toEqual({
+            data: 'testData',
+            status: 'loading',
+            fetchStatus: 'fetching',
+            error: null,
+            isStale: expect.any(Function),
+            refetch: expect.any(Function),
+            remove: expect.any(Function),
+        })
+        expect(states[3]).toEqual({
+            data: 'testData',
+            status: 'success',
+            fetchStatus: 'idle',
+            error: null,
+            isStale: expect.any(Function),
+            refetch: expect.any(Function),
+            remove: expect.any(Function),
+        })
+    })
+
+    it('手动执行refetch后重启fail请求并返回正确结果', async () => {
+        const key = ['queryKey_1']
+        const states: any[] = []
+
+        function Page() {
+            const state = useQuery(key, queryFnUnsuccess, { retry: false, staleTime: 2000 })
+            states.push(state)
+            return (<>
+                <div>Status:{state.status}</div>
+                <button onClick={() => { state.refetch() }}>Refetch</button>
+            </>)
+        }
+        const rendered = render(<Page />)
+        await rendered.findByText('Status:error')
+        expect(queryCount).toEqual(1)
+        expect(states.length).toEqual(2)
+        await userEvent.click(screen.getByText('Refetch'))
+        await rendered.findByText('Status:error')
+        expect(queryCount).toEqual(2)
+        expect(states.length).toEqual(4)
+
+
+        expect(states[0]).toEqual({
+            data: undefined,
+            status: 'loading',
+            fetchStatus: 'fetching',
+            error: null,
+            isStale: expect.any(Function),
+            refetch: expect.any(Function),
+            remove: expect.any(Function),
+        })
+        expect(states[1]).toEqual({
+            data: undefined,
+            status: 'error',
+            fetchStatus: 'idle',
+            error: 'rejected',
+            isStale: expect.any(Function),
+            refetch: expect.any(Function),
+            remove: expect.any(Function),
+        })
+        expect(states[2]).toEqual({
+            data: undefined,
+            status: 'loading',
+            fetchStatus: 'fetching',
+            error: 'rejected',
+            isStale: expect.any(Function),
+            refetch: expect.any(Function),
+            remove: expect.any(Function),
+        })
+        expect(states[3]).toEqual({
+            data: undefined,
+            status: 'error',
+            fetchStatus: 'idle',
+            error: 'rejected',
+            isStale: expect.any(Function),
+            refetch: expect.any(Function),
+            remove: expect.any(Function),
+        })
+    })
+
+    it('手动执行refetch后,执行success回调', async () => {
+        const key = ['queryKey_1']
+        const states: any[] = []
+        const onSuccess = jest.fn()
+        function Page() {
+            const state = useQuery(key, queryFnSuccess, { onSuccess, staleTime: 2000 })
+            states.push(state)
+            return (<>
+                <div>Status:{state.status}</div>
+                <button onClick={() => { state.refetch() }}>Refetch</button>
+            </>)
+        }
+        const rendered = render(<Page />)
+        await rendered.findByText('Status:success')
+        expect(onSuccess).toHaveBeenCalledTimes(1)
+        expect(onSuccess).toHaveBeenCalledWith('testData')
+
+        await userEvent.click(screen.getByText('Refetch'))
+        await rendered.findByText('Status:success')
+        expect(onSuccess).toHaveBeenCalledTimes(2)
+        expect(onSuccess).toHaveBeenCalledWith('testData')
+    })
+
+    it('手动执行refetch后,执行fail回调', async () => {
+        const key = ['queryKey_1']
+        const states: any[] = []
+        const onFail = jest.fn()
+        function Page() {
+            const state = useQuery(key, queryFnUnsuccess, { onFail, retry: 1, staleTime: 2000 })
+            states.push(state)
+            return (<>
+                <div>Status:{state.status}</div>
+                <button onClick={() => { state.refetch() }}>Refetch</button>
+            </>)
+        }
+        const rendered = render(<Page />)
+
+        await rendered.findByText('Status:error')
+        expect(onFail).toHaveBeenCalledTimes(1)
+
+        await userEvent.click(screen.getByText('Refetch'))
+        await rendered.findByText('Status:error')
+        expect(onFail).toHaveBeenCalledTimes(2)
+
+    })
+
+    it('手动执行refetch后,执行error回调', async () => {
+        const key = ['queryKey_1']
+        const states: any[] = []
+        const onError = jest.fn()
+        function Page() {
+            const state = useQuery(key, queryFnUnsuccess, { onError, retry: false, staleTime: 2000 })
+            states.push(state)
+            return (<>
+                <div>Status:{state.status}</div>
+                <button onClick={() => { state.refetch() }}>Refetch</button>
+            </>)
+        }
+        const rendered = render(<Page />)
+
+        await rendered.findByText('Status:error')
+        expect(onError).toHaveBeenCalledTimes(1)
+        expect(onError).toHaveBeenCalledWith('rejected')
+
+        await userEvent.click(screen.getByText('Refetch'))
+        await rendered.findByText('Status:error')
+        expect(onError).toHaveBeenCalledTimes(2)
+        expect(onError).toHaveBeenCalledWith('rejected')
+    })
 })
-
-
-
-// export interface QueryObserverResult {
-//     status: QueryStatus
-//     fetchStatus: FetchStatus
-//     data: any
-//     error: Error | null
-//     isStale: () => boolean
-//     refetch: Function
-//     remove: Function
-// }
-
 
 
 
