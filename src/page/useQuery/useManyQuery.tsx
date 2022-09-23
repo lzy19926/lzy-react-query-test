@@ -1,5 +1,5 @@
 import React from 'react';
-import { useQuery, useQueryClient } from '../lzy-React-query/index'
+import { useQuery, useQueryClient } from '../../lzy-React-query/index'
 import { getUser, queryFnSuccess, queryFnFail, queryFnUndefined } from './queryFn'
 import { useState } from 'react';
 
